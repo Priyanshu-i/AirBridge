@@ -10,7 +10,6 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#F3EDF7" />
 
-    <!-- External Libraries for Compression, QR Generation, and QR Scanning -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
@@ -25,10 +24,6 @@
         --md-sys-color-surface: #fef7ff;
         --md-sys-color-on-surface: #1d1b20;
         --md-sys-color-surface-container: #f3edf7;
-        --md-sys-color-error: #b3261e;
-        --md-sys-elevation-1:
-          0px 1px 3px 1px rgba(0, 0, 0, 0.15),
-          0px 1px 2px 0px rgba(0, 0, 0, 0.3);
         font-family:
           system-ui,
           -apple-system,
@@ -45,7 +40,6 @@
         flex-direction: column;
         height: 100vh;
       }
-
       header {
         background-color: var(--md-sys-color-surface);
         padding: 16px;
@@ -55,22 +49,25 @@
         border-bottom: 1px solid #e7e0ec;
       }
 
+      .main-view {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
       .tabs {
         display: flex;
         background: var(--md-sys-color-surface);
       }
-
       .tab {
         flex: 1;
         text-align: center;
         padding: 14px;
         font-weight: 500;
         cursor: pointer;
-        color: var(--md-sys-color-on-surface);
         border-bottom: 2px solid transparent;
         transition: 0.2s;
       }
-
       .tab.active {
         color: var(--md-sys-color-primary);
         border-bottom: 2px solid var(--md-sys-color-primary);
@@ -79,22 +76,18 @@
       .container {
         flex: 1;
         padding: 16px;
-        overflow-y: auto;
         display: none;
         flex-direction: column;
         align-items: center;
         gap: 16px;
       }
-
       .container.active {
         display: flex;
       }
-
       .card {
         background: var(--md-sys-color-surface-container);
         padding: 24px;
         border-radius: 16px;
-        box-shadow: var(--md-sys-elevation-1);
         width: 100%;
         max-width: 400px;
         text-align: center;
@@ -110,14 +103,8 @@
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        box-shadow: var(--md-sys-elevation-1);
-        transition: background 0.2s;
         width: 100%;
         margin-top: 8px;
-      }
-
-      .btn:active {
-        background-color: #4f378b;
       }
       .btn-secondary {
         background-color: var(--md-sys-color-primary-container);
@@ -127,15 +114,6 @@
       input[type="file"] {
         display: none;
       }
-
-      .pin-display {
-        font-size: 32px;
-        letter-spacing: 4px;
-        font-weight: bold;
-        color: var(--md-sys-color-primary);
-        margin: 16px 0;
-      }
-
       #reader {
         width: 100%;
         border-radius: 16px;
@@ -146,133 +124,163 @@
         margin: 16px auto;
         border-radius: 8px;
       }
+
+      /* SYSTEM DIAGNOSTICS TERMINAL */
+      .terminal-container {
+        background: #121212;
+        color: #00ff00;
+        font-family: monospace;
+        font-size: 11px;
+        padding: 12px;
+        height: 180px;
+        overflow-y: auto;
+        width: 100%;
+        box-sizing: border-box;
+        border-top: 3px solid #333;
+      }
+      .terminal-header {
+        color: #888;
+        border-bottom: 1px solid #333;
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
+      .log-error {
+        color: #ff5555;
+      }
+      .log-warn {
+        color: #ffb86c;
+      }
     </style>
   </head>
   <body>
     <header>LocalShare P2P</header>
 
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('sender')">Send File</div>
-      <div class="tab" onclick="switchTab('receiver')">Receive File</div>
+    <div class="main-view">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('sender')">Send File</div>
+        <div class="tab" onclick="switchTab('receiver')">Receive File</div>
+      </div>
+
+      <!-- SENDER TAB -->
+      <div id="sender" class="container active">
+        <div class="card" id="sender-setup">
+          <h3>1. Select a File</h3>
+          <label class="btn" for="file-input">Choose File</label>
+          <input
+            type="file"
+            id="file-input"
+            onchange="handleFileSelect(event)"
+          />
+          <p
+            id="file-name"
+            style="font-size: 13px; margin-top: 8px; font-weight: bold"
+          ></p>
+        </div>
+
+        <div class="card" id="sender-qr-card" style="display: none">
+          <h3>2. Receiver Scans This</h3>
+          <canvas id="sender-qr-canvas"></canvas>
+          <button class="btn btn-secondary" onclick="startScanner('sender')">
+            3. Scan Receiver's Answer
+          </button>
+        </div>
+      </div>
+
+      <!-- RECEIVER TAB -->
+      <div id="receiver" class="container">
+        <div class="card" id="receiver-setup">
+          <h3>1. Connect to Sender</h3>
+          <button class="btn" onclick="startScanner('receiver')">
+            Scan Sender's QR
+          </button>
+          <p style="font-size: 12px; margin-top: 8px">
+            Or open autofill link from camera.
+          </p>
+        </div>
+
+        <div class="card" id="receiver-qr-card" style="display: none">
+          <h3>2. Sender Scans This</h3>
+          <canvas id="receiver-qr-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- SHARED SCANNER & TRANSFER UI -->
+      <div class="container" id="scanner-container">
+        <div class="card">
+          <div id="reader"></div>
+          <button class="btn btn-secondary" onclick="stopScanner()">
+            Cancel Scan
+          </button>
+        </div>
+      </div>
+
+      <div class="container" id="transfer-container">
+        <div class="card">
+          <h3 id="transfer-status">Connected!</h3>
+          <progress
+            id="progress-bar"
+            value="0"
+            max="100"
+            style="width: 100%; height: 12px; border-radius: 6px"
+          ></progress>
+          <a
+            id="download-link"
+            class="btn"
+            style="display: none; text-decoration: none"
+            download
+            >Save File</a
+          >
+        </div>
+      </div>
     </div>
 
-    <!-- SENDER TAB -->
-    <div id="sender" class="container active">
-      <div class="card" id="sender-setup">
-        <h3>1. Select a File</h3>
-        <label class="btn" for="file-input">Choose File</label>
-        <input type="file" id="file-input" onchange="handleFileSelect(event)" />
-        <p id="file-name" style="font-size: 12px; margin-top: 8px"></p>
-      </div>
-
-      <div class="card" id="sender-qr-card" style="display: none">
-        <h3>2. Receiver Scans This</h3>
-        <canvas id="sender-qr-canvas"></canvas>
-        <p>Encryption PIN:</p>
-        <div class="pin-display" id="sender-pin"></div>
-        <button class="btn btn-secondary" onclick="startScanner('sender')">
-          3. Scan Receiver's Answer
-        </button>
-      </div>
-    </div>
-
-    <!-- RECEIVER TAB -->
-    <div id="receiver" class="container">
-      <div class="card" id="receiver-setup">
-        <h3>1. Connect to Sender</h3>
-        <button class="btn" onclick="startScanner('receiver')">
-          Scan Sender's QR
-        </button>
-        <p style="font-size: 12px; margin-top: 8px">
-          Or open the autofill link from your camera app.
-        </p>
-      </div>
-
-      <div class="card" id="receiver-qr-card" style="display: none">
-        <h3>2. Sender Scans This</h3>
-        <canvas id="receiver-qr-canvas"></canvas>
-        <p>Show this to the sender to complete the handshake.</p>
-      </div>
-    </div>
-
-    <!-- SHARED SCANNER & TRANSFER UI -->
-    <div class="container" id="scanner-container">
-      <div class="card">
-        <div id="reader"></div>
-        <button class="btn btn-secondary" onclick="stopScanner()">
-          Cancel Scan
-        </button>
-      </div>
-    </div>
-
-    <div class="container" id="transfer-container">
-      <div class="card">
-        <h3 id="transfer-status">Connected!</h3>
-        <progress
-          id="progress-bar"
-          value="0"
-          max="100"
-          style="width: 100%"
-        ></progress>
-        <a
-          id="download-link"
-          class="btn"
-          style="display: none; text-decoration: none"
-          download
-          >Save File</a
-        >
-      </div>
+    <!-- DIAGNOSTICS LOG -->
+    <div class="terminal-container">
+      <div class="terminal-header">System Diagnostics</div>
+      <div id="terminal-log"></div>
     </div>
 
     <script>
       // --- APP STATE ---
-      let mode = "sender"; // 'sender' | 'receiver'
-      let pc = new RTCPeerConnection({ iceServers: [] }); // Local network only
+      let mode = "sender";
+      let pc = new RTCPeerConnection({ iceServers: [] });
       let dataChannel;
       let fileToSend = null;
-      let pinStr = "";
-      let cryptoKey = null;
       let html5QrcodeScanner = null;
 
-      // --- CRYPTO LOGIC (PIN Encryption) ---
-      async function deriveKey(pin) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey(
-          "raw",
-          enc.encode(pin),
-          { name: "PBKDF2" },
-          false,
-          ["deriveKey"],
-        );
-        return crypto.subtle.deriveKey(
-          {
-            name: "PBKDF2",
-            salt: enc.encode("LocalShareSalt"),
-            iterations: 100000,
-            hash: "SHA-256",
-          },
-          keyMaterial,
-          { name: "AES-GCM", length: 256 },
-          false,
-          ["encrypt", "decrypt"],
-        );
+      // --- TERMINAL LOGGER ---
+      function logTerminal(msg, type = "info") {
+        const logBox = document.getElementById("terminal-log");
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        const entry = document.createElement("div");
+        entry.className =
+          type === "error" ? "log-error" : type === "warn" ? "log-warn" : "";
+        entry.innerText = `[${time}] ${msg}`;
+        logBox.appendChild(entry);
+        logBox.scrollTop = logBox.scrollHeight;
       }
 
-      // --- COMPRESSION LOGIC (SDP -> Base64URL) ---
-      function compressToken(desc, pin) {
-        const payload = JSON.stringify({ s: desc.sdp, t: desc.type, p: pin });
+      // --- COMPRESSION LOGIC (Raw Tokens) ---
+      function compressToken(desc) {
+        const payload = JSON.stringify({ s: desc.sdp, t: desc.type });
         const deflated = pako.deflate(payload);
-        const b64 = btoa(String.fromCharCode.apply(null, deflated));
-        return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // Base64URL
+        return btoa(String.fromCharCode.apply(null, deflated))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
       }
 
       function decompressToken(token) {
         const b64 = token.replace(/-/g, "+").replace(/_/g, "/");
-        const binStr = atob(b64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-        const inflated = pako.inflate(bytes, { to: "string" });
-        return JSON.parse(inflated);
+        const bytes = new Uint8Array(
+          atob(b64)
+            .split("")
+            .map((c) => c.charCodeAt(0)),
+        );
+        return JSON.parse(pako.inflate(bytes, { to: "string" }));
       }
 
       // --- UI NAVIGATION ---
@@ -284,55 +292,89 @@
         document
           .querySelectorAll(".container")
           .forEach((c) => (c.style.display = "none"));
-
         document
           .querySelector(`.tab:nth-child(${mode === "sender" ? 1 : 2})`)
           .classList.add("active");
         document.getElementById(mode).style.display = "flex";
+        logTerminal(`Switched to ${mode} mode`);
       }
 
-      // --- WEBRTC SETUP ---
+      // --- WEBRTC CORE EVENTS ---
+      pc.onconnectionstatechange = () =>
+        logTerminal(`WebRTC State: ${pc.connectionState}`);
+      pc.onsignalingstatechange = () =>
+        logTerminal(`Signaling: ${pc.signalingState}`);
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          logTerminal(
+            `ICE Candidate: ${e.candidate.address || e.candidate.candidate.split(" ")[4] || "mDNS/Local"}`,
+          );
+        }
+      };
+
       pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === "connected") showTransferUI();
+        logTerminal(`ICE Connection: ${pc.iceConnectionState}`);
+        if (
+          pc.iceConnectionState === "connected" ||
+          pc.iceConnectionState === "completed"
+        ) {
+          showTransferUI();
+        } else if (pc.iceConnectionState === "failed") {
+          logTerminal(
+            "FAILED: Devices cannot see each other on this Wi-Fi/Hotspot.",
+            "error",
+          );
+        }
       };
 
       function setupDataChannel(channel) {
         channel.binaryType = "arraybuffer";
         channel.onopen = () => {
+          logTerminal("Data Channel OPEN", "info");
           showTransferUI();
           if (mode === "sender") sendFile();
         };
 
         let receiveBuffer = [];
         let receivedSize = 0;
+        let currentMeta = null;
 
         channel.onmessage = async (e) => {
+          // 1. Receive Metadata First
           if (typeof e.data === "string") {
-            const meta = JSON.parse(e.data);
-            document.getElementById("transfer-status").innerText =
-              `Receiving ${meta.name}...`;
-            document.getElementById("progress-bar").max = meta.size;
-          } else {
-            // Decrypt chunk
-            const iv = e.data.slice(0, 12);
-            const ciphertext = e.data.slice(12);
-            const decrypted = await crypto.subtle.decrypt(
-              { name: "AES-GCM", iv: new Uint8Array(iv) },
-              cryptoKey,
-              ciphertext,
-            );
-
-            receiveBuffer.push(decrypted);
-            receivedSize += decrypted.byteLength;
+            currentMeta = JSON.parse(e.data);
+            if (currentMeta.type === "meta") {
+              logTerminal(`Incoming file detected: ${currentMeta.name}`);
+              document.getElementById("transfer-status").innerText =
+                `Receiving ${currentMeta.name}...`;
+              document.getElementById("progress-bar").max = currentMeta.size;
+            }
+          }
+          // 2. Receive Raw File Chunks
+          else {
+            receiveBuffer.push(e.data);
+            receivedSize += e.data.byteLength;
             document.getElementById("progress-bar").value = receivedSize;
 
-            if (receivedSize >= document.getElementById("progress-bar").max) {
-              const blob = new Blob(receiveBuffer);
+            if (receivedSize >= currentMeta.size) {
+              logTerminal(`File transfer complete! Compiling blob...`);
+
+              // Reconstruct file with correct MIME type
+              const blob = new Blob(receiveBuffer, {
+                type: currentMeta.mime || "application/octet-stream",
+              });
               const link = document.getElementById("download-link");
+
+              // Critical Fix: Hardcode the exact original filename to the download attribute
               link.href = URL.createObjectURL(blob);
+              link.download = currentMeta.name;
+
               link.style.display = "block";
               document.getElementById("transfer-status").innerText =
                 "Transfer Complete!";
+              receiveBuffer = [];
+              receivedSize = 0;
             }
           }
         };
@@ -343,20 +385,17 @@
         fileToSend = event.target.files[0];
         if (!fileToSend) return;
         document.getElementById("file-name").innerText = fileToSend.name;
-
-        pinStr = Math.floor(1000 + Math.random() * 9000).toString();
-        cryptoKey = await deriveKey(pinStr);
-        document.getElementById("sender-pin").innerText = pinStr;
+        logTerminal(`Selected: ${fileToSend.name}`);
 
         dataChannel = pc.createDataChannel("fileTransfer");
         setupDataChannel(dataChannel);
 
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Wait a moment for ICE candidates to gather locally
-        setTimeout(() => {
-          const token = compressToken(pc.localDescription, pinStr);
+        let qrGenerated = false;
+        const generateQR = () => {
+          if (qrGenerated) return;
+          qrGenerated = true;
+          logTerminal("Local IPs found. Generating QR Offer.");
+          const token = compressToken(pc.localDescription);
           const url = `${window.location.origin}${window.location.pathname}?t=${token}`;
           new QRious({
             element: document.getElementById("sender-qr-canvas"),
@@ -364,72 +403,95 @@
             size: 200,
             level: "M",
           });
-
           document.getElementById("sender-setup").style.display = "none";
           document.getElementById("sender-qr-card").style.display = "block";
-        }, 1000);
+        };
+
+        // Critical Fix: Wait for ICE gathering to COMPLETE before making QR
+        pc.onicegatheringstatechange = () => {
+          logTerminal(`Gathering: ${pc.iceGatheringState}`);
+          if (pc.iceGatheringState === "complete") generateQR();
+        };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Fallback in case browser hangs on 'complete' event
+        setTimeout(generateQR, 2000);
       }
 
       async function sendFile() {
+        logTerminal(`Sending meta: ${fileToSend.name}`);
+        // Send formatting info first
         dataChannel.send(
-          JSON.stringify({ name: fileToSend.name, size: fileToSend.size }),
+          JSON.stringify({
+            type: "meta",
+            name: fileToSend.name,
+            size: fileToSend.size,
+            mime: fileToSend.type,
+          }),
         );
+
         const chunkSize = 16384;
         let offset = 0;
 
         while (offset < fileToSend.size) {
+          // Critical Stability Fix: Prevent the browser buffer from overflowing on large files
+          while (dataChannel.bufferedAmount > 1024 * 1024 * 2) {
+            await new Promise((r) => setTimeout(r, 10));
+          }
+
           const slice = fileToSend.slice(offset, offset + chunkSize);
           const buffer = await slice.arrayBuffer();
 
-          // Encrypt Chunk
-          const iv = crypto.getRandomValues(new Uint8Array(12));
-          const ciphertext = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv },
-            cryptoKey,
-            buffer,
-          );
+          dataChannel.send(buffer);
+          offset += buffer.byteLength;
 
-          // Combine IV and Ciphertext
-          const payload = new Uint8Array(iv.length + ciphertext.byteLength);
-          payload.set(iv, 0);
-          payload.set(new Uint8Array(ciphertext), iv.length);
-
-          dataChannel.send(payload);
-          offset += chunkSize;
-          document.getElementById("progress-bar").value = offset;
+          if (offset % (chunkSize * 10) === 0) {
+            // Throttle UI updates
+            document.getElementById("progress-bar").value = offset;
+          }
         }
+        document.getElementById("progress-bar").value = fileToSend.size;
+        logTerminal(`Finished sending bytes.`);
         document.getElementById("transfer-status").innerText =
           "Sent Successfully!";
       }
 
       // --- RECEIVER LOGIC ---
-      pc.ondatachannel = (event) => {
-        setupDataChannel(event.channel);
-      };
+      pc.ondatachannel = (event) => setupDataChannel(event.channel);
 
       async function processOffer(token) {
+        logTerminal(`Processing Sender Offer...`);
         const data = decompressToken(token);
-        pinStr = data.p;
-        cryptoKey = await deriveKey(pinStr);
-
         await pc.setRemoteDescription(
           new RTCSessionDescription({ type: data.t, sdp: data.s }),
         );
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
 
-        setTimeout(() => {
-          const answerToken = compressToken(pc.localDescription, pinStr);
+        let answerGenerated = false;
+        const generateAnswerQR = () => {
+          if (answerGenerated) return;
+          answerGenerated = true;
+          logTerminal(`Answer Ready. Generating QR.`);
+          const answerToken = compressToken(pc.localDescription);
           new QRious({
             element: document.getElementById("receiver-qr-canvas"),
             value: answerToken,
             size: 200,
             level: "M",
           });
-
           document.getElementById("receiver-setup").style.display = "none";
           document.getElementById("receiver-qr-card").style.display = "block";
-        }, 1000);
+        };
+
+        pc.onicegatheringstatechange = () => {
+          logTerminal(`Gathering (Answer): ${pc.iceGatheringState}`);
+          if (pc.iceGatheringState === "complete") generateAnswerQR();
+        };
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        setTimeout(generateAnswerQR, 2000);
       }
 
       // --- SCANNER LOGIC ---
@@ -438,6 +500,7 @@
           .querySelectorAll(".container")
           .forEach((c) => (c.style.display = "none"));
         document.getElementById("scanner-container").style.display = "flex";
+        logTerminal(`Camera scanner opened for ${target}`);
 
         html5QrcodeScanner = new Html5Qrcode("reader");
         html5QrcodeScanner.start(
@@ -445,18 +508,23 @@
           { fps: 10, qrbox: { width: 250, height: 250 } },
           async (decodedText) => {
             stopScanner();
-            if (target === "receiver") {
-              const url = new URL(decodedText);
-              const token = url.searchParams.get("t");
-              if (token) processOffer(token);
-            } else if (target === "sender") {
-              const data = decompressToken(decodedText);
-              await pc.setRemoteDescription(
-                new RTCSessionDescription({ type: data.t, sdp: data.s }),
-              );
+            logTerminal(`QR Scanned Successfully!`);
+            try {
+              if (target === "receiver") {
+                const url = new URL(decodedText);
+                const token = url.searchParams.get("t");
+                if (token) processOffer(token);
+              } else if (target === "sender") {
+                const data = decompressToken(decodedText);
+                await pc.setRemoteDescription(
+                  new RTCSessionDescription({ type: data.t, sdp: data.s }),
+                );
+              }
+            } catch (e) {
+              logTerminal(`Scan error: ${e.message}`, "error");
             }
           },
-          (errorMessage) => {
+          () => {
             /* Ignore constant scan failures */
           },
         );
@@ -479,14 +547,15 @@
 
       // --- AUTOFILL URL CHECK ---
       window.onload = () => {
+        logTerminal("App loaded and ready.");
         if ("serviceWorker" in navigator)
           navigator.serviceWorker.register("sw.js");
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get("t");
         if (token) {
+          logTerminal("Autofill Token detected in URL");
           switchTab("receiver");
           processOffer(token);
-          // Clean URL to prevent refresh issues
           window.history.replaceState(
             {},
             document.title,

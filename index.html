@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>LocalShare P2P</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#F3EDF7" />
+
+    <!-- External Libraries for Compression, QR Generation, and QR Scanning -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+      /* Material 3 Design Tokens */
+      :root {
+        --md-sys-color-primary: #6750a4;
+        --md-sys-color-on-primary: #ffffff;
+        --md-sys-color-primary-container: #eaddff;
+        --md-sys-color-on-primary-container: #21005d;
+        --md-sys-color-surface: #fef7ff;
+        --md-sys-color-on-surface: #1d1b20;
+        --md-sys-color-surface-container: #f3edf7;
+        --md-sys-color-error: #b3261e;
+        --md-sys-elevation-1:
+          0px 1px 3px 1px rgba(0, 0, 0, 0.15),
+          0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+        font-family:
+          system-ui,
+          -apple-system,
+          Roboto,
+          sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--md-sys-color-surface);
+        color: var(--md-sys-color-on-surface);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      header {
+        background-color: var(--md-sys-color-surface);
+        padding: 16px;
+        text-align: center;
+        font-size: 22px;
+        font-weight: 500;
+        border-bottom: 1px solid #e7e0ec;
+      }
+
+      .tabs {
+        display: flex;
+        background: var(--md-sys-color-surface);
+      }
+
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--md-sys-color-on-surface);
+        border-bottom: 2px solid transparent;
+        transition: 0.2s;
+      }
+
+      .tab.active {
+        color: var(--md-sys-color-primary);
+        border-bottom: 2px solid var(--md-sys-color-primary);
+      }
+
+      .container {
+        flex: 1;
+        padding: 16px;
+        overflow-y: auto;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .container.active {
+        display: flex;
+      }
+
+      .card {
+        background: var(--md-sys-color-surface-container);
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: var(--md-sys-elevation-1);
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      .btn {
+        background-color: var(--md-sys-color-primary);
+        color: var(--md-sys-color-on-primary);
+        border: none;
+        border-radius: 100px;
+        padding: 10px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: var(--md-sys-elevation-1);
+        transition: background 0.2s;
+        width: 100%;
+        margin-top: 8px;
+      }
+
+      .btn:active {
+        background-color: #4f378b;
+      }
+      .btn-secondary {
+        background-color: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .pin-display {
+        font-size: 32px;
+        letter-spacing: 4px;
+        font-weight: bold;
+        color: var(--md-sys-color-primary);
+        margin: 16px 0;
+      }
+
+      #reader {
+        width: 100%;
+        border-radius: 16px;
+        overflow: hidden;
+        margin-top: 16px;
+      }
+      #qr-canvas {
+        margin: 16px auto;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>LocalShare P2P</header>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('sender')">Send File</div>
+      <div class="tab" onclick="switchTab('receiver')">Receive File</div>
+    </div>
+
+    <!-- SENDER TAB -->
+    <div id="sender" class="container active">
+      <div class="card" id="sender-setup">
+        <h3>1. Select a File</h3>
+        <label class="btn" for="file-input">Choose File</label>
+        <input type="file" id="file-input" onchange="handleFileSelect(event)" />
+        <p id="file-name" style="font-size: 12px; margin-top: 8px"></p>
+      </div>
+
+      <div class="card" id="sender-qr-card" style="display: none">
+        <h3>2. Receiver Scans This</h3>
+        <canvas id="sender-qr-canvas"></canvas>
+        <p>Encryption PIN:</p>
+        <div class="pin-display" id="sender-pin"></div>
+        <button class="btn btn-secondary" onclick="startScanner('sender')">
+          3. Scan Receiver's Answer
+        </button>
+      </div>
+    </div>
+
+    <!-- RECEIVER TAB -->
+    <div id="receiver" class="container">
+      <div class="card" id="receiver-setup">
+        <h3>1. Connect to Sender</h3>
+        <button class="btn" onclick="startScanner('receiver')">
+          Scan Sender's QR
+        </button>
+        <p style="font-size: 12px; margin-top: 8px">
+          Or open the autofill link from your camera app.
+        </p>
+      </div>
+
+      <div class="card" id="receiver-qr-card" style="display: none">
+        <h3>2. Sender Scans This</h3>
+        <canvas id="receiver-qr-canvas"></canvas>
+        <p>Show this to the sender to complete the handshake.</p>
+      </div>
+    </div>
+
+    <!-- SHARED SCANNER & TRANSFER UI -->
+    <div class="container" id="scanner-container">
+      <div class="card">
+        <div id="reader"></div>
+        <button class="btn btn-secondary" onclick="stopScanner()">
+          Cancel Scan
+        </button>
+      </div>
+    </div>
+
+    <div class="container" id="transfer-container">
+      <div class="card">
+        <h3 id="transfer-status">Connected!</h3>
+        <progress
+          id="progress-bar"
+          value="0"
+          max="100"
+          style="width: 100%"
+        ></progress>
+        <a
+          id="download-link"
+          class="btn"
+          style="display: none; text-decoration: none"
+          download
+          >Save File</a
+        >
+      </div>
+    </div>
+
+    <script>
+      // --- APP STATE ---
+      let mode = "sender"; // 'sender' | 'receiver'
+      let pc = new RTCPeerConnection({ iceServers: [] }); // Local network only
+      let dataChannel;
+      let fileToSend = null;
+      let pinStr = "";
+      let cryptoKey = null;
+      let html5QrcodeScanner = null;
+
+      // --- CRYPTO LOGIC (PIN Encryption) ---
+      async function deriveKey(pin) {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+          "raw",
+          enc.encode(pin),
+          { name: "PBKDF2" },
+          false,
+          ["deriveKey"],
+        );
+        return crypto.subtle.deriveKey(
+          {
+            name: "PBKDF2",
+            salt: enc.encode("LocalShareSalt"),
+            iterations: 100000,
+            hash: "SHA-256",
+          },
+          keyMaterial,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"],
+        );
+      }
+
+      // --- COMPRESSION LOGIC (SDP -> Base64URL) ---
+      function compressToken(desc, pin) {
+        const payload = JSON.stringify({ s: desc.sdp, t: desc.type, p: pin });
+        const deflated = pako.deflate(payload);
+        const b64 = btoa(String.fromCharCode.apply(null, deflated));
+        return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); // Base64URL
+      }
+
+      function decompressToken(token) {
+        const b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+        const binStr = atob(b64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+        const inflated = pako.inflate(bytes, { to: "string" });
+        return JSON.parse(inflated);
+      }
+
+      // --- UI NAVIGATION ---
+      function switchTab(newMode) {
+        mode = newMode;
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelectorAll(".container")
+          .forEach((c) => (c.style.display = "none"));
+
+        document
+          .querySelector(`.tab:nth-child(${mode === "sender" ? 1 : 2})`)
+          .classList.add("active");
+        document.getElementById(mode).style.display = "flex";
+      }
+
+      // --- WEBRTC SETUP ---
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === "connected") showTransferUI();
+      };
+
+      function setupDataChannel(channel) {
+        channel.binaryType = "arraybuffer";
+        channel.onopen = () => {
+          showTransferUI();
+          if (mode === "sender") sendFile();
+        };
+
+        let receiveBuffer = [];
+        let receivedSize = 0;
+
+        channel.onmessage = async (e) => {
+          if (typeof e.data === "string") {
+            const meta = JSON.parse(e.data);
+            document.getElementById("transfer-status").innerText =
+              `Receiving ${meta.name}...`;
+            document.getElementById("progress-bar").max = meta.size;
+          } else {
+            // Decrypt chunk
+            const iv = e.data.slice(0, 12);
+            const ciphertext = e.data.slice(12);
+            const decrypted = await crypto.subtle.decrypt(
+              { name: "AES-GCM", iv: new Uint8Array(iv) },
+              cryptoKey,
+              ciphertext,
+            );
+
+            receiveBuffer.push(decrypted);
+            receivedSize += decrypted.byteLength;
+            document.getElementById("progress-bar").value = receivedSize;
+
+            if (receivedSize >= document.getElementById("progress-bar").max) {
+              const blob = new Blob(receiveBuffer);
+              const link = document.getElementById("download-link");
+              link.href = URL.createObjectURL(blob);
+              link.style.display = "block";
+              document.getElementById("transfer-status").innerText =
+                "Transfer Complete!";
+            }
+          }
+        };
+      }
+
+      // --- SENDER LOGIC ---
+      async function handleFileSelect(event) {
+        fileToSend = event.target.files[0];
+        if (!fileToSend) return;
+        document.getElementById("file-name").innerText = fileToSend.name;
+
+        pinStr = Math.floor(1000 + Math.random() * 9000).toString();
+        cryptoKey = await deriveKey(pinStr);
+        document.getElementById("sender-pin").innerText = pinStr;
+
+        dataChannel = pc.createDataChannel("fileTransfer");
+        setupDataChannel(dataChannel);
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Wait a moment for ICE candidates to gather locally
+        setTimeout(() => {
+          const token = compressToken(pc.localDescription, pinStr);
+          const url = `${window.location.origin}${window.location.pathname}?t=${token}`;
+          new QRious({
+            element: document.getElementById("sender-qr-canvas"),
+            value: url,
+            size: 200,
+            level: "M",
+          });
+
+          document.getElementById("sender-setup").style.display = "none";
+          document.getElementById("sender-qr-card").style.display = "block";
+        }, 1000);
+      }
+
+      async function sendFile() {
+        dataChannel.send(
+          JSON.stringify({ name: fileToSend.name, size: fileToSend.size }),
+        );
+        const chunkSize = 16384;
+        let offset = 0;
+
+        while (offset < fileToSend.size) {
+          const slice = fileToSend.slice(offset, offset + chunkSize);
+          const buffer = await slice.arrayBuffer();
+
+          // Encrypt Chunk
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const ciphertext = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: iv },
+            cryptoKey,
+            buffer,
+          );
+
+          // Combine IV and Ciphertext
+          const payload = new Uint8Array(iv.length + ciphertext.byteLength);
+          payload.set(iv, 0);
+          payload.set(new Uint8Array(ciphertext), iv.length);
+
+          dataChannel.send(payload);
+          offset += chunkSize;
+          document.getElementById("progress-bar").value = offset;
+        }
+        document.getElementById("transfer-status").innerText =
+          "Sent Successfully!";
+      }
+
+      // --- RECEIVER LOGIC ---
+      pc.ondatachannel = (event) => {
+        setupDataChannel(event.channel);
+      };
+
+      async function processOffer(token) {
+        const data = decompressToken(token);
+        pinStr = data.p;
+        cryptoKey = await deriveKey(pinStr);
+
+        await pc.setRemoteDescription(
+          new RTCSessionDescription({ type: data.t, sdp: data.s }),
+        );
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        setTimeout(() => {
+          const answerToken = compressToken(pc.localDescription, pinStr);
+          new QRious({
+            element: document.getElementById("receiver-qr-canvas"),
+            value: answerToken,
+            size: 200,
+            level: "M",
+          });
+
+          document.getElementById("receiver-setup").style.display = "none";
+          document.getElementById("receiver-qr-card").style.display = "block";
+        }, 1000);
+      }
+
+      // --- SCANNER LOGIC ---
+      function startScanner(target) {
+        document
+          .querySelectorAll(".container")
+          .forEach((c) => (c.style.display = "none"));
+        document.getElementById("scanner-container").style.display = "flex";
+
+        html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          async (decodedText) => {
+            stopScanner();
+            if (target === "receiver") {
+              const url = new URL(decodedText);
+              const token = url.searchParams.get("t");
+              if (token) processOffer(token);
+            } else if (target === "sender") {
+              const data = decompressToken(decodedText);
+              await pc.setRemoteDescription(
+                new RTCSessionDescription({ type: data.t, sdp: data.s }),
+              );
+            }
+          },
+          (errorMessage) => {
+            /* Ignore constant scan failures */
+          },
+        );
+      }
+
+      function stopScanner() {
+        if (html5QrcodeScanner) {
+          html5QrcodeScanner.stop();
+          document.getElementById("scanner-container").style.display = "none";
+          document.getElementById(mode).style.display = "flex";
+        }
+      }
+
+      function showTransferUI() {
+        document
+          .querySelectorAll(".container")
+          .forEach((c) => (c.style.display = "none"));
+        document.getElementById("transfer-container").style.display = "flex";
+      }
+
+      // --- AUTOFILL URL CHECK ---
+      window.onload = () => {
+        if ("serviceWorker" in navigator)
+          navigator.serviceWorker.register("sw.js");
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get("t");
+        if (token) {
+          switchTab("receiver");
+          processOffer(token);
+          // Clean URL to prevent refresh issues
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname,
+          );
+        }
+      };
+    </script>
+  </body>
+</html>
